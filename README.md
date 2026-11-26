@@ -9,7 +9,7 @@ Backend em **Python (FastAPI)**, front-end em **Next.js + Leaflet**, deploy na *
 |---|---|---|
 | IPMA, avisos (`warnings_www.json`, área `PTO`) | Avisos oficiais ativos | Oficial, verificada |
 | IPMA, previsão diária (`globalIdLocal` 1131200) | Chuva, temperatura | Oficial, verificada |
-| Open-Meteo / CAMS | Índice europeu de qualidade do ar | **Modelado**, opcional, não verificada |
+| Open-Meteo / CAMS | Índice europeu de qualidade do ar | **Modelado** (não são medições), opcional; respondeu em produção em 2026-11-26 |
 | QualAr/APA, SNIRH (rios) | Medições reais | **Não integradas**: sem API pública estável confirmada |
 
 Os limiares de cheias e calor em `porto_resiliente/rules.py` são **heurísticas locais**
