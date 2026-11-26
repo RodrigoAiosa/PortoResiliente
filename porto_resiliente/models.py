@@ -33,6 +33,9 @@ class ZoneAlert(BaseModel):
 
 
 class AlertsResponse(BaseModel):
+    simulated: bool = False
+    # True se avisos ou previsão do IPMA falharam: os "verdes" não são fiáveis
+    degraded: bool = False
     updated_at: str
     sources: list[str]
     notes: list[str]

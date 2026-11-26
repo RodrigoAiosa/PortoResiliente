@@ -53,13 +53,10 @@ def flood_level(forecast: list[dict], rain_warning: Level) -> tuple[Level, str]:
                 f"Previsão de chuva {'forte' if cls >= 3 else 'moderada'} "
                 f"({prob:.0f}% de probabilidade) em {day.get('date')}"
             )
+    # Aviso e previsão vêm da mesma fonte (IPMA): usa-se o mais alto, sem os somar.
     if rain_warning > level:
-        # aviso oficial de precipitação eleva o risco numa zona ribeirinha
         level = rain_warning
         reason = f"Aviso {rain_warning.label} de precipitação do IPMA"
-    elif rain_warning >= Level.ORANGE and level >= Level.YELLOW:
-        level = Level(min(level + 1, Level.RED))
-        reason += " + aviso de precipitação do IPMA"
     return level, reason
 
 

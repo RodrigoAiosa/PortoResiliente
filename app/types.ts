@@ -17,6 +17,7 @@ export interface ZoneAlert {
 }
 
 export interface AlertsResponse {
+  simulated?: boolean;
   updated_at: string;
   sources: string[];
   notes: string[];

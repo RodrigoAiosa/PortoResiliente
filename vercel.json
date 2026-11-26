@@ -1,5 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }]
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }],
+  "schedules": {
+    "notificar-zonas": {
+      "schedule": "*/15 * * * *",
+      "path": "/api/cron/notify",
+      "requestMethod": "GET"
+    }
+  }
 }

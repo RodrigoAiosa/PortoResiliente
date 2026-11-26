@@ -6,16 +6,32 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from . import airquality, ipma
+from . import airquality, demo, ipma
 from .models import AlertsResponse
 from .rules import evaluate_zone
 from .zones import ZONES
 
 TZ = ZoneInfo("Europe/Lisbon")
+DISCLAIMER = "Informação indicativa. Em emergência ligue 112 e siga a Proteção Civil."
 
 
-async def build_alerts() -> AlertsResponse:
-    now = datetime.now(TZ).replace(tzinfo=None)  # IPMA usa hora local sem offset
+def _now_local() -> datetime:
+    return datetime.now(TZ).replace(tzinfo=None)  # IPMA usa hora local sem offset
+
+
+async def build_alerts(demo_scenario: str | None = None) -> AlertsResponse:
+    now = _now_local()
+
+    if demo_scenario:
+        warnings, forecast, aqi = demo.scenario(demo_scenario, now)
+        return AlertsResponse(
+            simulated=True,
+            updated_at=datetime.now(TZ).isoformat(timespec="seconds"),
+            sources=["SIMULAÇÃO (dados fictícios)"],
+            notes=[f"Cenário simulado «{demo_scenario}». Não são alertas reais.", DISCLAIMER],
+            zones=[evaluate_zone(z, warnings, forecast, aqi) for z in ZONES],
+        )
+
     notes: list[str] = []
     sources = ["IPMA (avisos e previsão)"]
 
@@ -42,9 +58,9 @@ async def build_alerts() -> AlertsResponse:
 
     zones = [evaluate_zone(z, warnings, forecast, aqi) for z in ZONES]
     return AlertsResponse(
+        degraded=isinstance(warnings_r, Exception) or isinstance(forecast_r, Exception),
         updated_at=datetime.now(TZ).isoformat(timespec="seconds"),
         sources=sources,
-        notes=notes
-        + ["Informação indicativa. Em emergência ligue 112 e siga a Proteção Civil."],
+        notes=notes + [DISCLAIMER],
         zones=zones,
     )

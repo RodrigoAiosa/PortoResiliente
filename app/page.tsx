@@ -16,8 +16,11 @@ export default function Home() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
+    // ?demo=chuva|calor|tempestade mostra uma SIMULAÇÃO (para testar o painel)
+    const demo = new URLSearchParams(window.location.search).get("demo");
+    const url = demo ? `/api/alerts?demo=${encodeURIComponent(demo)}` : "/api/alerts";
     const load = () =>
-      fetch("/api/alerts")
+      fetch(url)
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .then((d: AlertsResponse) => {
           setData(d);
@@ -35,6 +38,12 @@ export default function Home() {
         <h1>Porto Resiliente</h1>
         <p>Cheias, calor, vento e qualidade do ar, por zona da cidade.</p>
       </header>
+
+      {data?.simulated && (
+        <div className="sim-banner" role="alert">
+          SIMULAÇÃO: estes alertas são fictícios e não refletem a situação real no Porto.
+        </div>
+      )}
 
       <div className="layout">
         <section className="panel" aria-label="Alertas por zona">
