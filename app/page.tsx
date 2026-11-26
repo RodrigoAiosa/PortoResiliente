@@ -112,7 +112,15 @@ export default function Home() {
         </section>
 
         <section className="map" aria-label="Mapa do Porto">
-          {data && <AlertMap zones={data.zones} selected={selected} onSelect={setSelected} />}
+          {data && (
+            <AlertMap
+              zones={data.zones}
+              forecast={data.forecast}
+              air={data.air_quality}
+              selected={selected}
+              onSelect={setSelected}
+            />
+          )}
         </section>
       </div>
     </main>

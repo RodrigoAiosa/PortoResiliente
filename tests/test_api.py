@@ -155,3 +155,42 @@ def test_cron_notify_ignores_cache(monkeypatch):
     c.get("/api/alerts")  # enche a cache
     c.get("/api/cron/notify", headers={"Authorization": "Bearer " + "s" * 20})
     assert calls == ["w", "f", "w", "f"]
+
+
+def test_response_exposes_forecast_air_and_warning_window():
+    body = TestClient(app).get("/api/alerts?demo=calor").json()
+    assert body["forecast"]["t_max"] == 39.0 and body["forecast"]["precip_prob"] == 0.0
+    assert body["air_quality"] == {"eaqi": 85.0, "label": "Muito fraca", "modeled": True}
+    calor = next(h for h in body["zones"][3]["hazards"] if h["type"] == "calor")
+    assert calor["valid_from"] and calor["valid_until"]  # janela do aviso oficial
+
+
+def test_real_path_exposes_forecast_and_air(monkeypatch):
+    from porto_resiliente import airquality, ipma
+
+    async def warnings(client, now):
+        return []
+
+    async def forecast(client):
+        return [{"date": "2026-11-26", "precip_prob": 76.0, "precip_class": 1, "t_min": 8.1, "t_max": 14.6, "wind_class": 1}]
+
+    async def aqi(client, lat, lon):
+        return 18.0
+
+    monkeypatch.setattr(ipma, "get_warnings", warnings)
+    monkeypatch.setattr(ipma, "get_forecast", forecast)
+    monkeypatch.setattr(airquality, "get_european_aqi", aqi)
+    body = TestClient(app).get("/api/alerts").json()
+    assert body["forecast"]["t_min"] == 8.1 and body["forecast"]["precip_class"] == 1
+    assert body["air_quality"]["label"] == "Boa"
+
+
+def test_no_forecast_or_air_when_unavailable(monkeypatch):
+    import httpx
+
+    async def boom(*a, **k):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", boom)
+    body = TestClient(app).get("/api/alerts").json()
+    assert body["forecast"] is None and body["air_quality"] is None

@@ -95,3 +95,21 @@ def test_reasons_use_portuguese_level_names():
     assert "vermelho" in reason and "red" not in reason
     z = evaluate_zone(BOAVISTA, parse_warnings(RAW_WARNINGS, NOW), [], None)
     assert "laranja" in z.hazards[0].reason
+
+
+def test_air_label_bands():
+    from porto_resiliente.rules import air_label
+
+    assert [air_label(x) for x in (10, 20, 59, 60, 85, 100, 150)] == [
+        "Boa", "Razoável", "Moderada", "Fraca", "Muito fraca", "Extremamente fraca", "Extremamente fraca"]
+
+
+def test_flood_window_only_when_official_warning_sets_level():
+    ws = parse_warnings(RAW_WARNINGS, NOW)  # aviso laranja de precipitação
+    z = evaluate_zone(RIBEIRA, ws, parse_forecast(RAW_FORECAST), None)
+    cheias = next(h for h in z.hazards if h.type == "cheias")
+    assert cheias.valid_from == "2026-11-26T12:00:00" and cheias.valid_until == "2026-11-27T12:00:00"
+    # só previsão (sem aviso): sem janela
+    z2 = evaluate_zone(RIBEIRA, [], parse_forecast(RAW_FORECAST), None)
+    c2 = next(h for h in z2.hazards if h.type == "cheias")
+    assert c2.valid_from is None and c2.valid_until is None

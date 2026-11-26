@@ -28,8 +28,22 @@ WARNING_TO_HAZARD = {
 }
 
 
-def _hazard(type_: str, level: Level, reason: str, source: str) -> Hazard:
-    return Hazard(type=type_, level=level.label, reason=reason, source=source)
+def _hazard(
+    type_: str, level: Level, reason: str, source: str,
+    valid_from: str | None = None, valid_until: str | None = None,
+) -> Hazard:
+    return Hazard(
+        type=type_, level=level.label, reason=reason, source=source,
+        valid_from=valid_from, valid_until=valid_until,
+    )
+
+
+def air_label(aqi: float) -> str:
+    """Classes do Índice Europeu de Qualidade do Ar (EAQI)."""
+    for limit, label in ((20, "Boa"), (40, "Razoável"), (60, "Moderada"), (80, "Fraca"), (100, "Muito fraca")):
+        if aqi < limit:
+            return label
+    return "Extremamente fraca"
 
 
 def flood_level(forecast: list[dict], rain_warning: Level) -> tuple[Level, str]:
@@ -93,6 +107,7 @@ def evaluate_zone(
 ) -> ZoneAlert:
     hazards: list[Hazard] = []
     rain_warning = Level.GREEN
+    rain_w: dict | None = None  # aviso de precipitação mais alto (para a janela de validade)
 
     for w in warnings:
         htype = WARNING_TO_HAZARD.get(w["type_name"])
@@ -102,18 +117,26 @@ def evaluate_zone(
             continue
         lvl = Level(w["level"])
         if htype == "chuva":
-            rain_warning = max(rain_warning, lvl)
+            if lvl > rain_warning:
+                rain_warning, rain_w = lvl, w
             if zone.flood_prone:
                 continue  # será reportado como "cheias"
         hazards.append(
-            _hazard(htype, lvl, f"Aviso {LEVEL_PT[lvl]} do IPMA ({w['type_name']})", "IPMA (aviso)")
+            _hazard(
+                htype, lvl, f"Aviso {LEVEL_PT[lvl]} do IPMA ({w['type_name']})", "IPMA (aviso)",
+                w.get("start"), w.get("end"),
+            )
         )
 
     if zone.flood_prone:
         lvl, reason = flood_level(forecast, rain_warning)
         if lvl > Level.GREEN:
             src = "IPMA (aviso + previsão)" if rain_warning > Level.GREEN else "Heurística local (previsão IPMA)"
-            hazards.append(_hazard("cheias", lvl, reason, src))
+            # a janela só se aplica se foi o aviso oficial a definir o nível
+            win = rain_w if rain_w is not None and lvl == rain_warning else None
+            hazards.append(
+                _hazard("cheias", lvl, reason, src, win and win.get("start"), win and win.get("end"))
+            )
 
     lvl, reason = heat_level(forecast)
     if lvl > Level.GREEN and not any(h.type == "calor" and Level[h.level.upper()] >= lvl for h in hazards):

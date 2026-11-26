@@ -21,6 +21,26 @@ class Hazard(BaseModel):
     level: str  # green | yellow | orange | red
     reason: str
     source: str  # IPMA (aviso), IPMA (previsão), heurística local, ...
+    # janela de validade do aviso oficial (hora de Lisboa, sem fuso); None se não aplicável
+    valid_from: str | None = None
+    valid_until: str | None = None
+
+
+class DayForecast(BaseModel):
+    """Previsão do IPMA para o Porto (a mesma para toda a cidade)."""
+
+    date: str | None = None
+    precip_prob: float | None = None  # %
+    precip_class: int | None = None  # classe IPMA de intensidade (1 fraca, 2 moderada, 3 forte)
+    t_min: float | None = None
+    t_max: float | None = None
+    wind_class: int | None = None  # classe IPMA de vento (1 fraco ... 4 muito forte)
+
+
+class AirQuality(BaseModel):
+    eaqi: float
+    label: str
+    modeled: bool = True  # modelo CAMS, não medição de estação
 
 
 class ZoneAlert(BaseModel):
@@ -39,4 +59,6 @@ class AlertsResponse(BaseModel):
     updated_at: str
     sources: list[str]
     notes: list[str]
+    forecast: DayForecast | None = None
+    air_quality: AirQuality | None = None
     zones: list[ZoneAlert]
