@@ -14,6 +14,8 @@ from .zones import Zone
 HEAT_T_MAX = {Level.YELLOW: 32.0, Level.ORANGE: 35.0, Level.RED: 38.0}
 EAQI = {Level.YELLOW: 60.0, Level.ORANGE: 80.0, Level.RED: 100.0}  # EAQI: "poor" a partir de 60
 
+LEVEL_PT = {Level.GREEN: "verde", Level.YELLOW: "amarelo", Level.ORANGE: "laranja", Level.RED: "vermelho"}
+
 WARNING_TO_HAZARD = {
     "Precipitação": "chuva",
     "Vento": "vento",
@@ -53,13 +55,10 @@ def flood_level(forecast: list[dict], rain_warning: Level) -> tuple[Level, str]:
                 f"Previsão de chuva {'forte' if cls >= 3 else 'moderada'} "
                 f"({prob:.0f}% de probabilidade) em {day.get('date')}"
             )
+    # Aviso e previsão vêm da mesma fonte (IPMA): usa-se o mais alto, sem os somar.
     if rain_warning > level:
-        # aviso oficial de precipitação eleva o risco numa zona ribeirinha
         level = rain_warning
-        reason = f"Aviso {rain_warning.label} de precipitação do IPMA"
-    elif rain_warning >= Level.ORANGE and level >= Level.YELLOW:
-        level = Level(min(level + 1, Level.RED))
-        reason += " + aviso de precipitação do IPMA"
+        reason = f"Aviso {LEVEL_PT[rain_warning]} de precipitação do IPMA"
     return level, reason
 
 
@@ -107,7 +106,7 @@ def evaluate_zone(
             if zone.flood_prone:
                 continue  # será reportado como "cheias"
         hazards.append(
-            _hazard(htype, lvl, f"Aviso {lvl.label} do IPMA ({w['type_name']})", "IPMA (aviso)")
+            _hazard(htype, lvl, f"Aviso {LEVEL_PT[lvl]} do IPMA ({w['type_name']})", "IPMA (aviso)")
         )
 
     if zone.flood_prone:

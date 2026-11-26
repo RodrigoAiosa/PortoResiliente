@@ -88,3 +88,10 @@ def test_coastal_zone_gets_sea_agitation():
 def test_all_green():
     z = evaluate_zone(BOAVISTA, [], [], None)
     assert z.level == "green" and z.hazards == []
+
+
+def test_reasons_use_portuguese_level_names():
+    lvl, reason = flood_level([], Level.RED)
+    assert "vermelho" in reason and "red" not in reason
+    z = evaluate_zone(BOAVISTA, parse_warnings(RAW_WARNINGS, NOW), [], None)
+    assert "laranja" in z.hazards[0].reason
