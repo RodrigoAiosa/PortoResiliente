@@ -47,7 +47,7 @@ def test_parse_forecast_converts_numbers_and_missing_fields():
 
 def test_flood_from_forecast_only():
     lvl, reason = flood_level(parse_forecast(RAW_FORECAST), Level.GREEN)
-    assert lvl == Level.YELLOW and "2026-11-26" in reason
+    assert lvl == Level.YELLOW and "26/11" in reason and "2026" not in reason
 
 
 def test_official_warning_raises_flood_level():
@@ -113,3 +113,10 @@ def test_flood_window_only_when_official_warning_sets_level():
     z2 = evaluate_zone(RIBEIRA, [], parse_forecast(RAW_FORECAST), None)
     c2 = next(h for h in z2.hazards if h.type == "cheias")
     assert c2.valid_from is None and c2.valid_until is None
+
+
+def test_dm_formats_and_tolerates_bad_input():
+    from porto_resiliente.rules import _dm
+
+    assert _dm("2026-11-26") == "26/11" and _dm(None) == "data desconhecida" and _dm("xx") == "xx"
+    assert "26/11" in heat_level([{"date": "2026-11-26", "t_max": 36.0}])[1]

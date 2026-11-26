@@ -28,6 +28,15 @@ WARNING_TO_HAZARD = {
 }
 
 
+def _dm(iso: str | None) -> str:
+    """'2026-11-26' -> '26/11' (texto em português para as pessoas)."""
+    try:
+        _, m, d = (iso or "").split("-")[:3]
+        return f"{d[:2]}/{m}"
+    except ValueError:
+        return iso or "data desconhecida"
+
+
 def _hazard(
     type_: str, level: Level, reason: str, source: str,
     valid_from: str | None = None, valid_until: str | None = None,
@@ -67,7 +76,7 @@ def flood_level(forecast: list[dict], rain_warning: Level) -> tuple[Level, str]:
             level = cand
             reason = (
                 f"Previsão de chuva {'forte' if cls >= 3 else 'moderada'} "
-                f"({prob:.0f}% de probabilidade) em {day.get('date')}"
+                f"({prob:.0f}% de probabilidade) em {_dm(day.get('date'))}"
             )
     # Aviso e previsão vêm da mesma fonte (IPMA): usa-se o mais alto, sem os somar.
     if rain_warning > level:
@@ -85,7 +94,7 @@ def heat_level(forecast: list[dict]) -> tuple[Level, str]:
         for lvl in (Level.RED, Level.ORANGE, Level.YELLOW):
             if t >= HEAT_T_MAX[lvl]:
                 if lvl > level:
-                    level, reason = lvl, f"Máxima prevista de {t:.0f} °C em {day.get('date')}"
+                    level, reason = lvl, f"Máxima prevista de {t:.0f} °C em {_dm(day.get('date'))}"
                 break
     return level, reason
 
