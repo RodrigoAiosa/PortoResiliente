@@ -20,9 +20,14 @@ async def health() -> dict:
 async def alerts(
     response: Response,
     demo: Literal["chuva", "calor", "tempestade"] | None = None,
+    refresh: bool = False,
 ) -> AlertsResponse:
-    """Alertas por zona. `?demo=chuva|calor|tempestade` devolve uma SIMULAÇÃO (simulated=true)."""
-    if demo:
+    """Alertas por zona.
+
+    `?demo=chuva|calor|tempestade` devolve uma SIMULAÇÃO (simulated=true).
+    `?refresh=1` ignora a cache da CDN (o servidor ainda limita a ~1 consulta/min ao IPMA).
+    """
+    if demo or refresh:
         response.headers["Cache-Control"] = "no-store"
     else:
         # cache na CDN da Vercel: 5 min, serve versão antiga enquanto revalida
@@ -39,5 +44,5 @@ async def cron_notify(authorization: str | None = Header(default=None)) -> dict:
     min_level = os.environ.get("NOTIFY_MIN_LEVEL", "orange")
     if min_level not in notify.ORDER or min_level == "green":
         min_level = "orange"
-    alerts = await build_alerts()
+    alerts = await build_alerts(use_cache=False)  # o cron decide sempre com dados frescos
     return await notify.run(alerts, notify.UpstashStore.from_env(), notify.NtfySender.from_env(), min_level)

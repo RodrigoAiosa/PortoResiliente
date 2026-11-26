@@ -86,7 +86,7 @@ vercel dev                                          # Next.js + API Python junto
 ## Deploy
 
 Importe o repositório na Vercel (preset Next.js). `/api/*` é reescrito para `api/index.py`.
-`/api/alerts` é cacheado na CDN (`s-maxage=300`).
+`/api/alerts` é cacheado na CDN (`s-maxage=300`). O botão «Atualizar dados» usa `?refresh=1` (ignora a CDN); para proteger o IPMA, cada instância só o consulta de novo passado ~60 s. A rota do cron nunca usa esta cache.
 
 ## Roadmap
 

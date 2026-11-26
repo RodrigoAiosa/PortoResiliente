@@ -3,6 +3,18 @@ from fastapi.testclient import TestClient
 from api.index import app
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _fresh_cache():
+    from porto_resiliente import service
+
+    service.clear_cache()
+    yield
+    service.clear_cache()
+
+
 def test_health():
     r = TestClient(app).get("/api/health")
     assert r.status_code == 200 and r.json() == {"status": "ok"}
@@ -75,3 +87,71 @@ def test_cron_notify_with_secret_degraded_skips(monkeypatch):
     monkeypatch.setenv("CRON_SECRET", "s" * 20)
     r = TestClient(app).get("/api/cron/notify", headers={"Authorization": "Bearer " + "s" * 20})
     assert r.status_code == 200 and r.json() == {"status": "skipped", "reason": "ipma_unavailable"}
+
+
+def _fake_sources(monkeypatch, calls):
+    from porto_resiliente import airquality, ipma
+
+    async def warnings(client, now):
+        calls.append("w")
+        return []
+
+    async def forecast(client):
+        calls.append("f")
+        return []
+
+    async def aqi(client, lat, lon):
+        return None
+
+    monkeypatch.setattr(ipma, "get_warnings", warnings)
+    monkeypatch.setattr(ipma, "get_forecast", forecast)
+    monkeypatch.setattr(airquality, "get_european_aqi", aqi)
+
+
+def test_refresh_bypasses_cdn_but_server_cache_limits_upstream(monkeypatch):
+    calls = []
+    _fake_sources(monkeypatch, calls)
+    c = TestClient(app)
+    r1 = c.get("/api/alerts")
+    assert "s-maxage" in r1.headers["cache-control"]
+    r2 = c.get("/api/alerts?refresh=1")
+    assert r2.headers["cache-control"] == "no-store"
+    assert calls == ["w", "f"]  # a 2.ª chamada serviu-se da cache de 60 s: o IPMA não foi consultado de novo
+
+
+def test_refresh_after_ttl_fetches_again(monkeypatch):
+    from porto_resiliente import service
+
+    calls = []
+    _fake_sources(monkeypatch, calls)
+    c = TestClient(app)
+    c.get("/api/alerts")
+    service._cache = (service._cache[0] - service.CACHE_TTL - 1, service._cache[1])  # expira a cache
+    c.get("/api/alerts?refresh=1")
+    assert calls == ["w", "f", "w", "f"]
+
+
+def test_failures_are_not_cached(monkeypatch):
+    import httpx
+
+    async def boom(*a, **k):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", boom)
+    c = TestClient(app)
+    assert c.get("/api/alerts").json()["degraded"] is True
+    monkeypatch.undo()
+    calls = []
+    _fake_sources(monkeypatch, calls)
+    assert c.get("/api/alerts").json()["degraded"] is False  # recuperou logo, sem esperar pelo TTL
+    assert calls == ["w", "f"]
+
+
+def test_cron_notify_ignores_cache(monkeypatch):
+    calls = []
+    _fake_sources(monkeypatch, calls)
+    monkeypatch.setenv("CRON_SECRET", "s" * 20)
+    c = TestClient(app)
+    c.get("/api/alerts")  # enche a cache
+    c.get("/api/cron/notify", headers={"Authorization": "Bearer " + "s" * 20})
+    assert calls == ["w", "f", "w", "f"]

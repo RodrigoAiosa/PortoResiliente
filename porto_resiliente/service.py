@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -19,7 +20,19 @@ def _now_local() -> datetime:
     return datetime.now(TZ).replace(tzinfo=None)  # IPMA usa hora local sem offset
 
 
-async def build_alerts(demo_scenario: str | None = None) -> AlertsResponse:
+# Cache curto por instância: o botão «Atualizar» pode ser clicado por qualquer pessoa,
+# por isso limita-se a frequência real de chamadas ao IPMA (~1 por minuto por instância).
+CACHE_TTL = 60.0
+_cache: tuple[float, AlertsResponse] | None = None
+
+
+def clear_cache() -> None:
+    global _cache
+    _cache = None
+
+
+async def build_alerts(demo_scenario: str | None = None, use_cache: bool = True) -> AlertsResponse:
+    global _cache
     now = _now_local()
 
     if demo_scenario:
@@ -31,6 +44,9 @@ async def build_alerts(demo_scenario: str | None = None) -> AlertsResponse:
             notes=[f"Cenário simulado «{demo_scenario}». Não são alertas reais.", DISCLAIMER],
             zones=[evaluate_zone(z, warnings, forecast, aqi) for z in ZONES],
         )
+
+    if use_cache and _cache is not None and time.monotonic() - _cache[0] < CACHE_TTL:
+        return _cache[1]
 
     notes: list[str] = []
     sources = ["IPMA (avisos e previsão)"]
@@ -57,10 +73,13 @@ async def build_alerts(demo_scenario: str | None = None) -> AlertsResponse:
         sources.append("Open-Meteo/CAMS (qualidade do ar, modelado)")
 
     zones = [evaluate_zone(z, warnings, forecast, aqi) for z in ZONES]
-    return AlertsResponse(
+    result = AlertsResponse(
         degraded=isinstance(warnings_r, Exception) or isinstance(forecast_r, Exception),
         updated_at=datetime.now(TZ).isoformat(timespec="seconds"),
         sources=sources,
         notes=notes + [DISCLAIMER],
         zones=zones,
     )
+    if not result.degraded:  # nunca guarda resultados de falha
+        _cache = (time.monotonic(), result)
+    return result

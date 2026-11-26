@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { HAZARD_LABEL, LEVEL_COLOR, LEVEL_LABEL, type AlertsResponse } from "./types";
 
 // Leaflet precisa do `window`: carregar só no cliente
@@ -14,23 +14,35 @@ export default function Home() {
   const [data, setData] = useState<AlertsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // refresh=true (botão) ignora a cache da CDN; o carregamento automático não.
+  const load = useCallback(async (refresh: boolean) => {
+    // ?demo=chuva|calor|tempestade mostra uma SIMULAÇÃO (para testar o painel)
+    const params = new URLSearchParams();
+    const demo = new URLSearchParams(window.location.search).get("demo");
+    if (demo) params.set("demo", demo);
+    if (refresh) params.set("refresh", "1");
+    const qs = params.toString();
+    setLoading(true);
+    try {
+      const r = await fetch(qs ? `/api/alerts?${qs}` : "/api/alerts");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setData((await r.json()) as AlertsResponse);
+      setError(null);
+    } catch (e) {
+      // mantém os últimos dados visíveis; só mostra o erro
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // ?demo=chuva|calor|tempestade mostra uma SIMULAÇÃO (para testar o painel)
-    const demo = new URLSearchParams(window.location.search).get("demo");
-    const url = demo ? `/api/alerts?demo=${encodeURIComponent(demo)}` : "/api/alerts";
-    const load = () =>
-      fetch(url)
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-        .then((d: AlertsResponse) => {
-          setData(d);
-          setError(null);
-        })
-        .catch((e: Error) => setError(e.message));
-    load();
-    const id = setInterval(load, 5 * 60 * 1000);
+    load(false);
+    const id = setInterval(() => load(false), 5 * 60 * 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [load]);
 
   return (
     <main>
@@ -47,7 +59,22 @@ export default function Home() {
 
       <div className="layout">
         <section className="panel" aria-label="Alertas por zona">
-          {error && <p className="error">Não foi possível carregar os alertas ({error}).</p>}
+          <div className="toolbar">
+            <button type="button" className="refresh" onClick={() => load(true)} disabled={loading}>
+              {loading ? "A atualizar…" : "↻ Atualizar dados"}
+            </button>
+            {data && (
+              <span className="muted" aria-live="polite">
+                Atualizado às{" "}
+                {new Date(data.updated_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
+          {error && (
+            <p className="error" role="alert">
+              Não foi possível atualizar os alertas ({error}).{data ? " A mostrar os últimos dados." : ""}
+            </p>
+          )}
           {!data && !error && <p>A carregar…</p>}
           {data?.zones.map((z) => (
             <article
