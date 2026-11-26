@@ -64,9 +64,8 @@ export default function Home() {
               {loading ? "A atualizar…" : "↻ Atualizar dados"}
             </button>
             {data && (
-              <span className="muted" aria-live="polite">
-                Atualizado às{" "}
-                {new Date(data.updated_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+              <span className="muted updated" aria-live="polite">
+                Atualizado: {new Date(data.updated_at).toLocaleString("pt-PT")}
               </span>
             )}
           </div>
@@ -104,7 +103,6 @@ export default function Home() {
           ))}
           {data && (
             <footer className="muted">
-              <p>Atualizado: {new Date(data.updated_at).toLocaleString("pt-PT")}</p>
               <p>Fontes: {data.sources.join("; ")}</p>
               {data.notes.map((n, i) => (
                 <p key={i}>{n}</p>
